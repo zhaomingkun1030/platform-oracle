@@ -1,0 +1,102 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: platform-oracle-config
+  namespace: default
+data:
+  LLM_PROVIDER: "google"
+  LLM_API_URL: "http://your-llm-service:8000/v1"
+  LLM_MODEL: "gpt-4"
+  SECRET_KEY: "platform-oracle-secret-key-change-in-production"
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: platform-oracle-secret
+  namespace: default
+type: Opaque
+stringData:
+  LLM_API_KEY: "your-api-key-here"
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: platform-oracle-pvc
+  namespace: default
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: platform-oracle
+  namespace: default
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: platform-oracle
+  template:
+    metadata:
+      labels:
+        app: platform-oracle
+    spec:
+      containers:
+      - name: backend
+        image: your-registry/platform-oracle:latest
+        ports:
+        - containerPort: 8000
+        envFrom:
+        - configMapRef:
+            name: platform-oracle-config
+        - secretRef:
+            name: platform-oracle-secret
+        volumeMounts:
+        - name: data
+          mountPath: /data
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "250m"
+          limits:
+            memory: "1Gi"
+            cpu: "1000m"
+      volumes:
+      - name: data
+        persistentVolumeClaim:
+          claimName: platform-oracle-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: platform-oracle
+  namespace: default
+spec:
+  selector:
+    app: platform-oracle
+  ports:
+  - port: 80
+    targetPort: 8000
+  type: ClusterIP
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: platform-oracle
+  namespace: default
+spec:
+  rules:
+  - host: platform-oracle.your-cluster.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: platform-oracle
+            port:
+              number: 80
