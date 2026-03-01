@@ -13,6 +13,18 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
     
+    - name: Show directory structure
+      run: |
+        echo "=== Root directory ==="
+        ls -la
+        echo "=== Backend directory ==="
+        ls -la backend/
+        echo "=== Dockerfile content ==="
+        cat Dockerfile
+    
+    - name: Set up Docker Buildx
+      uses: actions/checkout@v4
+    
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@v3
     
