@@ -24,8 +24,8 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-# Install nginx and supervisor
-RUN apt-get update && apt-get install -y nginx supervisor curl && \
+# Install nginx
+RUN apt-get update && apt-get install -y nginx curl && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Copy backend
@@ -34,15 +34,15 @@ COPY --from=backend-builder /app /app
 # Copy frontend build
 COPY --from=frontend-builder /app/frontend/dist /var/www/html
 
-# Create nginx config
-command=python -m uvicorn main:app --host 0.0.0.0 --port 8000
+# Create startup script
+RUN echo '#!/bin/bash\nnginx -g "daemon off;" &\ncd /app && python -m uvicorn main:app --host 0.0.0.0 --port 8000' > /start.sh && chmod +x /start.sh
 
-# Configure nginx to serve frontend and proxy API
-RUN echo 'server {\n    listen 80;\n    server_name _;\n    root /var/www/html;\n    index index.html;\n\n    location / {\n        try_files $uri $uri/ /index.html;\n    }\n\n    location /api {\n        proxy_pass http://127.0.0.1:8000;\n        proxy_set_header Host $host;\n        proxy_set_header X-Real-IP $remote_addr;\n        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;\n        proxy_set_header X-Forwarded-Proto $scheme;\n    }\n\n    location /health {\n        proxy_pass http://127.0.0.1:8000;\n    }\n}' > /etc/nginx/sites-available/default
+# Configure nginx
+RUN echo 'server {\n    listen 80;\n    server_name _;\n    root /var/www/html;\n    index index.html;\n\n    location / {\n        try_files $uri $uri/ /index.html;\n    }\n\n\n    location /api {\n        proxy_pass http://127.0.0.1:8000;\n        proxy_set_header Host $host;\n        proxy_set_header X-Real-IP $remote_addr;\n        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;\n        proxy_set_header X-Forwarded-Proto $scheme;\n    }\n\n    location /health {\n        proxy_pass http://127.0.0.1:8000;\n    }\n}' > /etc/nginx/sites-available/default
 
 # Create data directories
 RUN mkdir -p /data/{config,runs,reports}
 
 EXPOSE 80
 
-CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]
+CMD ["/start.sh"]
