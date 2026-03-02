@@ -35,7 +35,7 @@ COPY --from=backend-builder /app /app
 COPY --from=frontend-builder /app/frontend/dist /var/www/html
 
 # Create nginx config
-RUN echo '[supervisord]\nnodaemon=true\n\n[program:nginx]\ncommand=nginx -g "daemon off;"\nstdout_logfile=/dev/stdout\nstdout_logfile_maxbytes=0\nstderr_logfile=/dev/stderr\nstderr_logfile_maxbytes=0\n\n[program:uvicorn]\ncommand=uvicorn main:app --host 0.0.0.0 --port 8000\ndirectory=/app\nstdout_logfile=/dev/stdout\nstdout_logfile_maxbytes=0\nstderr_logfile=/dev/stderr\nstderr_logfile_maxbytes=0\n' > /etc/supervisor/conf.d/supervisord.conf
+RUN echo '[supervisord]\nnodaemon=true\n\n[program:nginx]\ncommand=nginx -g "daemon off;"\nstdout_logfile=/dev/stdout\nstdout_logfile_maxbytes=0\nstderr_logfile=/dev/stderr\nstderr_logfile_maxbytes=0\n\n[program:uvicorn]\ncommand=/usr/local/bin/uvicorn main:app --host 0.0.0.0 --port 8000\ndirectory=/app\nstdout_logfile=/dev/stdout\nstdout_logfile_maxbytes=0\nstderr_logfile=/dev/stderr\nstderr_logfile_maxbytes=0\n' > /etc/supervisor/conf.d/supervisord.conf
 
 # Configure nginx to serve frontend and proxy API
 RUN echo 'server {\n    listen 80;\n    server_name _;\n    root /var/www/html;\n    index index.html;\n\n    location / {\n        try_files $uri $uri/ /index.html;\n    }\n\n    location /api {\n        proxy_pass http://127.0.0.1:8000;\n        proxy_set_header Host $host;\n        proxy_set_header X-Real-IP $remote_addr;\n        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;\n        proxy_set_header X-Forwarded-Proto $scheme;\n    }\n\n    location /health {\n        proxy_pass http://127.0.0.1:8000;\n    }\n}' > /etc/nginx/sites-available/default
