@@ -24,7 +24,7 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-# Install nginx
+MB|# Install nginx\nBY|RUN apt-get update && apt-get install -y nginx curl && \nTV|    apt-get clean && rm -rf /var/lib/apt/lists/*\n\nSB|# Install uvicorn\nVW|RUN pip install --no-cache-dir uvicorn[standard]
 RUN apt-get update && apt-get install -y nginx curl && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 
