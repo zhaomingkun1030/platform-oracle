@@ -63,6 +63,10 @@ LLM_API_URL = os.getenv("LLM_API_URL", "http://localhost:8000/v1")
 LLM_API_KEY = os.getenv("LLM_API_KEY", "")
 LLM_MODEL = os.getenv("LLM_MODEL", "gemini-2.0-flash-lite")
 
+# Azure 特定配置
+AZURE_DEPLOYMENT = os.getenv("AZURE_OPENAI_DEPLOYMENT_NAME", os.getenv("AZURE_DEPLOYMENT", ""))
+
+
 
 # ==================== 数据模型 ====================
 
@@ -157,14 +161,17 @@ class CompetitorAnalysisSystem:
             provider=LLM_PROVIDER,
             api_url=LLM_API_URL,
             api_key=LLM_API_KEY,
-            model=LLM_MODEL
+            model=LLM_MODEL,
+            azure_deployment=AZURE_DEPLOYMENT
         )
         self.predictor_agent = PredictorAgent(
             provider=LLM_PROVIDER,
             api_url=LLM_API_URL,
             api_key=LLM_API_KEY,
-            model=LLM_MODEL
+            model=LLM_MODEL,
+            azure_deployment=AZURE_DEPLOYMENT
         )
+
         self.url_fetcher = URLFetcher()
         self.excel_generator = ExcelGenerator()
     
@@ -208,7 +215,20 @@ class CompetitorAnalysisSystem:
                 "analysis": analysis_result,
                 "prediction": predictor_result
             }
-            
+        except Exception as e:
+            import traceback
+            error_msg = f"{str(e)}\n{traceback.format_exc()}"
+            print(f"ERROR in analyze: {error_msg}")
+            end_time = datetime.now().isoformat()
+            return {
+                "id": analysis_id,
+                "url": url,
+                "status": "failed",
+                "start_time": start_time,
+                "end_time": end_time,
+                "analyst": analyst,
+                "error": error_msg
+            }
         except Exception as e:
             end_time = datetime.now().isoformat()
             return {
@@ -228,11 +248,14 @@ analysis_system = CompetitorAnalysisSystem()
 
 # ==================== API 路由 ====================
 
+# 管理员用户名和密码 - 从环境变量读取
+ADMIN_USERNAME = os.getenv("ADMIN_USERNAME", "admin")
+ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "admin123456")
+
 @app.post("/api/auth/login", response_model=LoginResponse)
 async def login(request: LoginRequest):
     """登录"""
-    # 硬编码 admin/admin123
-    if request.username == "admin" and request.password == "admin123":
+    if request.username == ADMIN_USERNAME and request.password == ADMIN_PASSWORD:
         access_token = create_access_token(
             data={"sub": request.username},
             expires_delta=timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
@@ -242,6 +265,13 @@ async def login(request: LoginRequest):
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Incorrect username or password"
     )
+
+@app.get("/api/auth/me")
+async def get_current_user(token: dict = Depends(verify_token)):
+    """获取当前用户信息"""
+    return {"username": token.get("sub")}
+
+
 
 
 @app.get("/api/analyses", response_model=List[AnalysisRecord])
@@ -273,7 +303,7 @@ async def create_analysis(
     
     # 保存记录
     runs = load_runs()
-    runs.insert(0, {
+    run_record = {
         "id": result["id"],
         "url": result["url"],
         "status": result["status"],
@@ -281,7 +311,12 @@ async def create_analysis(
         "end_time": result.get("end_time"),
         "analyst": result["analyst"],
         "report_file": result.get("report_file")
-    })
+    }
+    # 如果有错误，保存错误信息
+    if "error" in result:
+        run_record["error"] = result["error"]
+    runs.insert(0, run_record)
+
     save_runs(runs)
     
     return AnalysisResponse(
@@ -309,9 +344,20 @@ async def delete_analysis(
 @app.get("/api/reports/{filename}")
 async def download_report(
     filename: str,
-    token: dict = Depends(verify_token)
+    token: str = None,
+    credentials: HTTPAuthorizationCredentials = Depends(HTTPBearer(auto_error=False))
 ):
-    """下载报告"""
+    """下载报告 - 支持query parameter或Authorization header"""
+    # 支持query parameter或header中的token
+    actual_token = token or (credentials.credentials if credentials else None)
+    if not actual_token:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    
+    try:
+        payload = jwt.decode(actual_token, SECRET_KEY, algorithms=[ALGORITHM])
+    except jwt.PyJWTError:
+        raise HTTPException(status_code=401, detail="Invalid token")
+    
     report_path = REPORTS_DIR / filename
     if not report_path.exists():
         raise HTTPException(status_code=404, detail="Report not found")

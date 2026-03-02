@@ -12,11 +12,12 @@ from langchain_core.messages import HumanMessage
 
 
 class AnalysisAgent:
-    """分析 Agent：负责内容分析、功能点提取、竞品策略解释"""
+    """分析 Agent：负责内容分析，功能点提取、竞品策略解释"""
     
-    def __init__(self, provider: str = "google", api_url: str = "", api_key: str = "", model: str = "gemini-2.0-flash-lite"):
+    def __init__(self, provider: str = "google", api_url: str = "", api_key: str = "", model: str = "gemini-2.0-flash-lite", azure_deployment: str = ""):
         self.provider = provider
         self.model = model
+        self.azure_deployment = azure_deployment
         
         # 根据 provider 初始化不同的 LLM
         if provider == "google":
@@ -26,6 +27,26 @@ class AnalysisAgent:
                 google_api_key=api_key,
                 temperature=0.7,
                 convert_system_message_to_human=True
+            )
+        elif provider == "alibaba" or provider == "dashscope":
+            # 使用阿里云 DashScope (OpenAI 兼容模式)
+            # 文档: https://help.aliyun.com/zh/model-studio/qwen-api-via-openai-chat-completions
+            dashscope_url = api_url.rstrip('/') if api_url else "https://dashscope.aliyuncs.com/compatible-mode/v1"
+            self.llm = ChatOpenAI(
+                model=model or "qwen-plus",
+                openai_api_base=dashscope_url,
+                openai_api_key=api_key,
+                temperature=0.7
+            )
+        elif provider == "azure":
+            # 使用 OpenAI 兼容模式调用 Azure (简化版本)
+            # Azure OpenAI 兼容端点格式: https://{resource}.cognitiveservices.azure.com/openai/v1/
+            azure_url = api_url.rstrip('/') if api_url else ""
+            self.llm = ChatOpenAI(
+                model=azure_deployment or model,
+                openai_api_base=azure_url,
+                openai_api_key=api_key,
+                temperature=0.7
             )
         else:
             # 使用 OpenAI 兼容接口
@@ -40,21 +61,14 @@ class AnalysisAgent:
         """获取默认 API URL"""
         urls = {
             "google": "https://generativelanguage.googleapis.com/v1beta",
+            "alibaba": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+            "dashscope": "https://dashscope.aliyuncs.com/compatible-mode/v1",
             "azure": os.getenv("AZURE_OPENAI_ENDPOINT", "https://api.openai.com/v1")
         }
         return urls.get(provider, "http://localhost:8000/v1")
     
     async def analyze(self, content: Dict[str, Any], source_url: str) -> Dict[str, Any]:
-        """
-        分析内容并提取功能点
-        
-        Args:
-            content: URL 内容，包含 text, html, video_info 等
-            source_url: 来源 URL
-        
-        Returns:
-            分析结果
-        """
+        """分析内容并提取功能点"""
         text = content.get("text", "")
         is_video = content.get("is_video", False)
         
@@ -146,7 +160,6 @@ class AnalysisAgent:
         
         # 尝试提取 JSON
         try:
-            # 查找 JSON 块
             json_match = re.search(r'\{[\s\S]*\}', analysis_text)
             if json_match:
                 result = json.loads(json_match.group())

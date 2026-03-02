@@ -3,6 +3,7 @@ Predictor Agent - 竞品 Roadmap 预测
 """
 
 import os
+import re
 from typing import Dict, Any
 from langchain_openai import ChatOpenAI
 from langchain_google_genai import ChatGoogleGenerativeAI
@@ -12,9 +13,10 @@ from langchain_core.messages import HumanMessage
 class PredictorAgent:
     """预测 Agent：负责竞品策略解释及 Roadmap 预测"""
     
-    def __init__(self, provider: str = "google", api_url: str = "", api_key: str = "", model: str = "gemini-2.0-flash-lite"):
+    def __init__(self, provider: str = "google", api_url: str = "", api_key: str = "", model: str = "gemini-2.0-flash-lite", azure_deployment: str = ""):
         self.provider = provider
         self.model = model
+        self.azure_deployment = azure_deployment
         
         # 根据 provider 初始化不同的 LLM
         if provider == "google":
@@ -25,6 +27,24 @@ class PredictorAgent:
                 temperature=0.7,
                 convert_system_message_to_human=True
             )
+        elif provider == "alibaba" or provider == "dashscope":
+            # 使用阿里云 DashScope (OpenAI 兼容模式)
+            dashscope_url = api_url.rstrip('/') if api_url else "https://dashscope.aliyuncs.com/compatible-mode/v1"
+            self.llm = ChatOpenAI(
+                model=model or "qwen-plus",
+                openai_api_base=dashscope_url,
+                openai_api_key=api_key,
+                temperature=0.7
+            )
+        elif provider == "azure":
+            # 使用 OpenAI 兼容模式调用 Azure
+            azure_url = api_url.rstrip('/') if api_url else ""
+            self.llm = ChatOpenAI(
+                model=azure_deployment or model,
+                openai_api_base=azure_url,
+                openai_api_key=api_key,
+                temperature=0.7
+            )
         else:
             # 使用 OpenAI 兼容接口
             self.llm = ChatOpenAI(
@@ -34,25 +54,19 @@ class PredictorAgent:
                 temperature=0.7
             )
     
+    
     def _get_default_url(self, provider: str) -> str:
         """获取默认 API URL"""
         urls = {
             "google": "https://generativelanguage.googleapis.com/v1beta",
+            "alibaba": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+            "dashscope": "https://dashscope.aliyuncs.com/compatible-mode/v1",
             "azure": os.getenv("AZURE_OPENAI_ENDPOINT", "https://api.openai.com/v1")
         }
         return urls.get(provider, "http://localhost:8000/v1")
     
     async def predict(self, analysis_result: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        基于分析结果预测竞品 Roadmap
-        
-        Args:
-            analysis_result: Analysis Agent 的分析结果
-        
-        Returns:
-            预测结果
-        """
-        # 构建 prompt
+        """基于分析结果预测竞品 Roadmap"""
         prompt = self._build_prediction_prompt(analysis_result)
         
         # 调用 LLM
@@ -72,7 +86,7 @@ class PredictorAgent:
         
         features_text = "\n".join([
             f"- {f.get('name', 'N/A')}: {f.get('description', '')}"
-            for f in features[:10]  # 限制数量
+            for f in features[:10]
         ])
         
         human_prompt = f"""你是一个专业的技术战略分析师，专门预测竞品的技术发展方向。
@@ -122,9 +136,7 @@ class PredictorAgent:
     def _parse_prediction(self, prediction_text: str, analysis_result: Dict[str, Any]) -> Dict[str, Any]:
         """解析预测结果"""
         import json
-        import re
         
-        # 尝试提取 JSON
         try:
             json_match = re.search(r'\{[\s\S]*\}', prediction_text)
             if json_match:
@@ -134,9 +146,6 @@ class PredictorAgent:
         except json.JSONDecodeError:
             result = {"raw_prediction": prediction_text}
         
-        # 添加基于现有功能的洞察
-        features = analysis_result.get("features", [])
-        if features:
-            result["based_on_features"] = [f.get("name", "") for f in features[:5]]
+        result["source_url"] = analysis_result.get("source_url", "")
         
         return result

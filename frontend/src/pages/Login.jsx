@@ -5,7 +5,7 @@ import axios from 'axios'
 
 const { Title } = Typography
 
-const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8000'
+const API_BASE = import.meta.env.VITE_API_BASE || ''
 
 function Login({ setToken }) {
   const [loading, setLoading] = useState(false)
@@ -56,11 +56,10 @@ function Login({ setToken }) {
           <Form.Item
             name="password"
             rules={[{ required: true, message: '请输入密码' }]}
-            initialValue="admin123"
           >
             <Input.Password 
               prefix={<LockOutlined />} 
-              placeholder="密码 (admin123)" 
+              placeholder="请输入密码" 
             />
           </Form.Item>
 

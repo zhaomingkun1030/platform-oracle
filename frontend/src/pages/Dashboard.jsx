@@ -9,14 +9,13 @@ import {
   Typography, 
   message, 
   Modal,
-  Spin,
   Divider
 } from 'antd'
 import { 
   PlayCircleOutlined, 
   DeleteOutlined, 
   DownloadOutlined,
-  LogoutOutlined,
+  LogoutOutlined, 
   LinkOutlined
 } from '@ant-design/icons'
 import axios from 'axios'
@@ -25,7 +24,7 @@ const { Header } = Layout
 const { Title } = Typography
 const { TextArea } = Input
 
-const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8000'
+const API_BASE = import.meta.env.VITE_API_BASE || ''
 
 function Dashboard({ token, onLogout }) {
   const [analyses, setAnalyses] = useState([])
@@ -33,10 +32,26 @@ function Dashboard({ token, onLogout }) {
   const [analyzing, setAnalyzing] = useState(false)
   const [url, setUrl] = useState('')
 
-  const api = axios.create({
-    baseURL: API_BASE,
-    headers: { Authorization: `Bearer ${token}` }
-  })
+  // Get token from props or localStorage
+  const getToken = () => {
+    return token || localStorage.getItem('token') || ''
+  }
+
+  // 转换为北京时间
+  const toBeijingTime = (utcTime) => {
+    if (!utcTime) return '-'
+    const date = new Date(utcTime)
+    date.setHours(date.getHours() + 8)
+    return date.toLocaleString('zh-CN', { 
+      timeZone: 'Asia/Shanghai',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit'
+    })
+  }
 
   useEffect(() => {
     fetchAnalyses()
@@ -45,10 +60,16 @@ function Dashboard({ token, onLogout }) {
   const fetchAnalyses = async () => {
     setLoading(true)
     try {
-      const response = await api.get('/api/analyses')
+      const currentToken = getToken()
+      const currentApi = axios.create({
+        baseURL: API_BASE,
+        headers: { Authorization: `Bearer ${currentToken}` }
+      })
+      const response = await currentApi.get('/api/analyses')
       setAnalyses(response.data)
     } catch (error) {
-      message.error('获取分析记录失败')
+      console.error('获取分析记录失败:', error)
+      message.error('获取分析记录失败: ' + (error.response?.data?.detail || error.message))
     } finally {
       setLoading(false)
     }
@@ -62,7 +83,13 @@ function Dashboard({ token, onLogout }) {
 
     setAnalyzing(true)
     try {
-      const response = await api.post('/api/analyses', {
+      const currentToken = getToken()
+      const currentApi = axios.create({
+        baseURL: API_BASE,
+        headers: { Authorization: `Bearer ${currentToken}` }
+      })
+      
+      const response = await currentApi.post('/api/analyses', {
         url: url,
         analyst: 'admin'
       })
@@ -71,7 +98,7 @@ function Dashboard({ token, onLogout }) {
       setUrl('')
       fetchAnalyses()
     } catch (error) {
-      message.error(error.response?.data?.detail || '分析失败')
+      message.error('分析失败: ' + (error.response?.data?.detail || error.message))
     } finally {
       setAnalyzing(false)
     }
@@ -85,7 +112,12 @@ function Dashboard({ token, onLogout }) {
       cancelText: '取消',
       onOk: async () => {
         try {
-          await api.delete(`/api/analyses/${id}`)
+          const currentToken = getToken()
+          const currentApi = axios.create({
+            baseURL: API_BASE,
+            headers: { Authorization: `Bearer ${currentToken}` }
+          })
+          await currentApi.delete(`/api/analyses/${id}`)
           message.success('删除成功')
           fetchAnalyses()
         } catch (error) {
@@ -96,8 +128,9 @@ function Dashboard({ token, onLogout }) {
   }
 
   const handleDownload = (filename) => {
+    const currentToken = getToken()
     const link = document.createElement('a')
-    link.href = `${API_BASE}/api/reports/${filename}`
+    link.href = `${API_BASE}/api/reports/${filename}?token=${currentToken}`
     link.download = filename
     link.click()
   }
@@ -127,13 +160,13 @@ function Dashboard({ token, onLogout }) {
       title: '启动时间',
       dataIndex: 'start_time',
       key: 'start_time',
-      render: (time) => new Date(time).toLocaleString('zh-CN')
+      render: (time) => toBeijingTime(time)
     },
     {
       title: '完成时间',
       dataIndex: 'end_time',
       key: 'end_time',
-      render: (time) => time ? new Date(time).toLocaleString('zh-CN') : '-'
+      render: (time) => toBeijingTime(time)
     },
     {
       title: '操作',
