@@ -49,6 +49,9 @@ spec:
       containers:
       - name: backend
         image: ghcr.io/zhaomingkun1030/platform-oracle:latest
+        imagePullPolicy: Always
+        ports:
+        image: ghcr.io/zhaomingkun1030/platform-oracle:latest
         ports:
         - containerPort: 8000
         envFrom:

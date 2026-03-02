@@ -7,13 +7,8 @@ import re
 from typing import Dict, Any, List
 from langchain_openai import ChatOpenAI
 from langchain_google_genai import ChatGoogleGenerativeAI
-from langchain.prompts import ChatPromptTemplate
-from langchain.schema import HumanMessage, SystemMessage
-import re
-from typing import Dict, Any, List
-from langchain_openai import ChatOpenAI
-from langchain.prompts import ChatPromptTemplate
-from langchain.schema import HumanMessage, SystemMessage
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.messages import HumanMessage
 
 
 class AnalysisAgent:
@@ -40,16 +35,6 @@ class AnalysisAgent:
                 openai_api_key=api_key or "dummy-key",
                 temperature=0.7
             )
-        self.provider = provider
-        self.model = model
-        
-        # 初始化 LLM
-        self.llm = ChatOpenAI(
-            model=model,
-            openai_api_base=api_url or self._get_default_url(provider),
-            openai_api_key=api_key or "dummy-key",
-            temperature=0.7
-        )
     
     def _get_default_url(self, provider: str) -> str:
         """获取默认 API URL"""
@@ -90,33 +75,32 @@ class AnalysisAgent:
     
     def _doc_analysis_prompt(self, text: str, source_url: str) -> List:
         """文档分析 Prompt"""
-        system_prompt = """你是一个专业的竞品分析专家，专门分析 Red Hat OpenShift 及其竞品的产品功能。
+        human_prompt = f"""你是一个专业的竞品分析专家，专门分析 Red Hat OpenShift 及其竞品的产品功能。
 
-请分析以下内容，提取结构化的功能点信息。
+请分析以下来自 {source_url} 的内容，提取结构化的功能点信息。
 
 输出格式要求（JSON）：
-{
+{{
     "features": [
-        {
+        {{
             "name": "功能名称",
             "description": "功能描述",
             "open_source_components": ["使用的开源组件"],
             "use_case": "使用场景",
             "competitor_strategy": "竞品策略解释"
-        }
+        }}
     ],
     "summary": "整体分析总结",
     "key_insights": ["关键洞察1", "关键洞察2"]
-}
+}}
 
 注意：
 - 功能名称要简洁明确
 - 开源组件如果是开源项目请标注
-- 竞品策略要分析竞品为什么做这个功能"""
-        
-        human_prompt = f"""请分析以下来自 {source_url} 的内容，提取功能点：
+- 竞品策略要分析竞品为什么做这个功能
 
-{text[:8000]}"""  # 限制长度
+请分析以下内容：
+{text[:8000]}"""
         
         return [HumanMessage(content=human_prompt)]
     
@@ -125,30 +109,29 @@ class AnalysisAgent:
         video_info = content.get("video_info", {})
         transcript = content.get("transcript", "")
         
-        system_prompt = """你是一个专业的竞品分析专家，专门分析 Red Hat OpenShift 及其竞品的产品功能。
+        human_prompt = f"""你是一个专业的竞品分析专家，专门分析 Red Hat OpenShift 及其竞品的产品功能。
 
 请分析视频内容，提取功能点和时间戳。
 
 输出格式要求（JSON）：
-{
+{{
     "features": [
-        {
+        {{
             "name": "功能名称",
             "description": "功能描述",
             "timestamp": "时间点，如 02:30",
             "open_source_components": ["使用的开源组件"],
             "use_case": "使用场景",
             "competitor_strategy": "竞品策略解释"
-        }
+        }}
     ],
     "video_summary": "视频整体总结",
     "key_insights": ["关键洞察1", "关键洞察2"]
-}
+}}
 
-注意：timestamp 是功能点出现在视频中的时间点。"""
-        
-        human_prompt = f"""请分析以下视频内容，提取功能点和时间戳：
+注意：timestamp 是功能点出现在视频中的时间点。
 
+请分析以下视频内容：
 视频标题: {video_info.get('title', 'N/A')}
 视频描述: {video_info.get('description', 'N/A')}
 
