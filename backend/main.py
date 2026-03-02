@@ -61,7 +61,7 @@ ACCESS_TOKEN_EXPIRE_MINUTES = 60
 LLM_PROVIDER = os.getenv("LLM_PROVIDER", "google")
 LLM_API_URL = os.getenv("LLM_API_URL", "http://localhost:8000/v1")
 LLM_API_KEY = os.getenv("LLM_API_KEY", "")
-LLM_MODEL = os.getenv("LLM_MODEL", "gpt-4")
+LLM_MODEL = os.getenv("LLM_MODEL", "gemini-2.0-flash-lite")
 
 
 # ==================== 数据模型 ====================

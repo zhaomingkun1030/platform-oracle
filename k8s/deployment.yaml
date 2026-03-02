@@ -5,6 +5,10 @@ metadata:
   namespace: platform-oracle-preproduct
 data:
   LLM_PROVIDER: "google"
+  LLM_API_URL: "https://generativelanguage.googleapis.com/v1beta"
+  LLM_MODEL: "gemini-2.0-flash-lite"
+  SECRET_KEY: "platform-oracle-secret-key-change-in-production"
+  LLM_PROVIDER: "google"
   LLM_API_URL: "http://your-llm-service:8000/v1"
   LLM_MODEL: "gpt-4"
   SECRET_KEY: "platform-oracle-secret-key-change-in-production"
@@ -16,6 +20,7 @@ metadata:
   namespace: platform-oracle-preproduct
 type: Opaque
 stringData:
+  LLM_API_KEY: "AIzaSyCYbrzSRn3Wa6CIl43mEAj8LVahvfCKtMQ"
   LLM_API_KEY: "your-api-key-here"
 ---
 apiVersion: v1
@@ -47,6 +52,7 @@ spec:
     spec:
       containers:
       - name: backend
+        image: ghcr.io/zhaomingkun1030/platform-oracle:latest
         image: nginx:alpine
         ports:
         - containerPort: 8000
@@ -88,6 +94,10 @@ metadata:
   namespace: default
 data:
   LLM_PROVIDER: "google"
+  LLM_API_URL: "https://generativelanguage.googleapis.com/v1beta"
+  LLM_MODEL: "gemini-2.0-flash-lite"
+  SECRET_KEY: "platform-oracle-secret-key-change-in-production"
+  LLM_PROVIDER: "google"
   LLM_API_URL: "http://your-llm-service:8000/v1"
   LLM_MODEL: "gpt-4"
   SECRET_KEY: "platform-oracle-secret-key-change-in-production"
@@ -99,6 +109,7 @@ metadata:
   namespace: default
 type: Opaque
 stringData:
+  LLM_API_KEY: "AIzaSyCYbrzSRn3Wa6CIl43mEAj8LVahvfCKtMQ"
   LLM_API_KEY: "your-api-key-here"
 ---
 apiVersion: v1
@@ -130,6 +141,7 @@ spec:
     spec:
       containers:
       - name: backend
+        image: ghcr.io/zhaomingkun1030/platform-oracle:latest
         image: your-registry/platform-oracle:latest
         ports:
         - containerPort: 8000

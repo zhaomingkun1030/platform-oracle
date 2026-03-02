@@ -6,6 +6,12 @@ import os
 import re
 from typing import Dict, Any, List
 from langchain_openai import ChatOpenAI
+from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain.prompts import ChatPromptTemplate
+from langchain.schema import HumanMessage, SystemMessage
+import re
+from typing import Dict, Any, List
+from langchain_openai import ChatOpenAI
 from langchain.prompts import ChatPromptTemplate
 from langchain.schema import HumanMessage, SystemMessage
 
@@ -13,7 +19,27 @@ from langchain.schema import HumanMessage, SystemMessage
 class AnalysisAgent:
     """分析 Agent：负责内容分析、功能点提取、竞品策略解释"""
     
-    def __init__(self, provider: str = "google", api_url: str = "", api_key: str = "", model: str = "gpt-4"):
+    def __init__(self, provider: str = "google", api_url: str = "", api_key: str = "", model: str = "gemini-2.0-flash-lite"):
+        self.provider = provider
+        self.model = model
+        
+        # 根据 provider 初始化不同的 LLM
+        if provider == "google":
+            # 使用 Google Gemini
+            self.llm = ChatGoogleGenerativeAI(
+                model=model,
+                google_api_key=api_key,
+                temperature=0.7,
+                convert_system_message_to_human=True
+            )
+        else:
+            # 使用 OpenAI 兼容接口
+            self.llm = ChatOpenAI(
+                model=model,
+                openai_api_base=api_url or self._get_default_url(provider),
+                openai_api_key=api_key or "dummy-key",
+                temperature=0.7
+            )
         self.provider = provider
         self.model = model
         
